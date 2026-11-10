@@ -30,6 +30,19 @@ jobs:
           vulkan-components: Vulkan-Headers, Vulkan-Loader
           vulkan-use-cache: true
 
+      - name: Set up glslangValidator
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'glslang.zip'
+          Invoke-WebRequest -Uri "https://github.com/KhronosGroup/glslang/releases/download/master-tot/glslang-master-windows-x64-Release.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'glslang')
+          $bin = Join-Path $env:RUNNER_TEMP 'glslang/bin'
+          $bin | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+          if ($env:VULKAN_SDK) {
+              Copy-Item (Join-Path $bin 'glslangValidator.exe') (Join-Path $env:VULKAN_SDK 'bin/glslangValidator.exe') -Force
+          }
+          & "$bin/glslangValidator.exe" --version
+
       - name: Configure CMake
         run: cmake -B build -A x64 -DCMAKE_BUILD_TYPE=Release
 
