@@ -1,0 +1,54 @@
+name: Build Windows
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Set up Vulkan SDK
+        uses: humbletim/setup-vulkan-sdk@v1.2.1
+        with:
+          vulkan-components: Vulkan-Headers, Vulkan-Loader
+          vulkan-use-cache: true
+
+      - name: Configure CMake
+        run: cmake -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build with CMake
+        run: cmake --build build --config Release --parallel
+
+      - name: Package Windows executable and DLLs
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          $binDir = if (Test-Path "build/bin") { "build/bin" } else { "build" }
+          Get-ChildItem -Path $binDir -Recurse -Include *.exe,*.dll | Where-Object { $_.FullName -notmatch "CMakeFiles" } | ForEach-Object {
+              Copy-Item $_.FullName -Destination dist/ -Force
+          }
+          Write-Host "Packaged files in dist/:"
+          Get-ChildItem dist
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fritchii-windows-pr38
+          path: dist/
+          if-no-files-found: error
